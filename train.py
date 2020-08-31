@@ -11,6 +11,7 @@ from torch.utils import data
 import torch.distributed as dist
 from torchvision import transforms, utils
 from tqdm import tqdm
+import utils as ut
 
 try:
     import wandb
@@ -19,7 +20,7 @@ except ImportError:
     wandb = None
 
 from model import Generator, Discriminator
-from dataset import MultiResolutionDataset
+from dataset import MultiResolutionDataset, ILSVRC_HDF5
 from distributed import (
     get_rank,
     synchronize,
@@ -162,8 +163,9 @@ def train(args, loader, generator, discriminator, g_optim, d_optim, g_ema, devic
             print("Done!")
 
             break
-
-        real_img = next(loader)
+        
+        '''Added [0] since dataset return [img, la]'''
+        real_img = next(loader)[0]
         real_img = real_img.to(device)
 
         requires_grad(generator, False)
@@ -378,13 +380,13 @@ if __name__ == "__main__":
     args.start_iter = 0
 
     generator = Generator(
-        args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
+        args.size//4, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
     ).to(device)
     discriminator = Discriminator(
-        args.size, channel_multiplier=args.channel_multiplier
+        args.size//4, channel_multiplier=args.channel_multiplier
     ).to(device)
     g_ema = Generator(
-        args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
+        args.size//4, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
     ).to(device)
     g_ema.eval()
     accumulate(g_ema, generator, 0)
@@ -439,13 +441,14 @@ if __name__ == "__main__":
 
     transform = transforms.Compose(
         [
-            transforms.RandomHorizontalFlip(),
+#             transforms.RandomHorizontalFlip(), #Commenting out for now --not sure if this is needed.
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
         ]
     )
 
-    dataset = MultiResolutionDataset(args.path, transform, args.size)
+#     dataset = MultiResolutionDataset(args.path, transform, args.size)
+    dataset = ILSVRC_HDF5(args.path, transform)
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch,

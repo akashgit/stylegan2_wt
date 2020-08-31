@@ -9,10 +9,23 @@ from tqdm import tqdm
 from torchvision import datasets
 from torchvision.transforms import functional as trans_fn
 
+import numpy as np
+
+
+norm_dict = np.load(path)
+shift, scale = norm_dict['shift'], norm_dict['scale']
+
+def denormalize_wt(x, shift, scale):
+    return ((x * 0.5) + 0.5) * scale - shift
+    
+def normalize_wt(x, shift, scale):
+    return (((x + shift) / scale) - 0.5) / 0.5
 
 def resize_and_convert(img, size, resample, quality=100):
     img = trans_fn.resize(img, size, resample)
     img = trans_fn.center_crop(img, size)
+    
+    img = normalize_wt(img, shift, scale)
     buffer = BytesIO()
     img.save(buffer, format='jpeg', quality=quality)
     val = buffer.getvalue()
